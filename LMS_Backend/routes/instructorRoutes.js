@@ -10,6 +10,7 @@ const {
 
 const {
     getCourses, createCourse, updateCourse, deleteCourse, getMyCourses, getCourseContent,
+    getCourseAnalytics,
     addWeek, deleteWeek, addMaterial, deleteMaterial, addLecture, deleteLecture,
     getCourseMaterials, uploadCourseMaterial, deleteCourseMaterial,
     getAnnouncements, createAnnouncement, deleteAnnouncement,
@@ -58,6 +59,7 @@ router.delete('/weeks/:id', requireCourseOwner, deleteWeek);
 // ===== Statistics & Tabs =====
 router.get('/courses/:courseId/participants', requireCourseOwner, getCourseParticipants);
 router.delete('/courses/:courseId/participants/:userId', requireCourseOwner, unenrollParticipant);
+router.get('/courses/:courseId/analytics', requireCourseOwner, getCourseAnalytics);
 router.get('/courses/:courseId/grades', requireCourseOwner, getCourseGrades);
 router.get('/courses/:courseId/grades/export', requireCourseOwner, exportGrades);
 router.get('/courses/:courseId/attendance', requireCourseOwner, getCourseAttendance);

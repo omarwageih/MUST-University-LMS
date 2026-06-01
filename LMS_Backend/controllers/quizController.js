@@ -9,10 +9,21 @@ const getQuizQuestions = async (req, res) => {
     try {
         const { quizId } = req.params;
         const pool = await getPool();
+
+        // 1. Get Quiz Metadata
+        const quizRes = await pool.request()
+            .input('quizId', sql.Int, quizId)
+            .query('SELECT * FROM Quizzes WHERE QuizID = @quizId');
+
+        if (quizRes.recordset.length === 0) return notFound(res, "Quiz not found.");
+        const quiz = quizRes.recordset[0];
+
+        // 2. Get Questions
         const questions = await pool.request()
             .input('quizId', sql.Int, quizId)
             .query(`
-                SELECT * FROM QuizQuestions
+                SELECT QuestionID, QuestionText, QuestionType, Points
+                FROM QuizQuestions
                 WHERE QuizID = @quizId
                 ORDER BY CreatedAt ASC
             `);
@@ -21,11 +32,14 @@ const getQuizQuestions = async (req, res) => {
         for (const q of questions.recordset) {
             const options = await pool.request()
                 .input('qId', sql.Int, q.QuestionID)
-                .query(`SELECT * FROM QuestionOptions WHERE QuestionID = @qId`);
+                .query(`SELECT OptionID, OptionText FROM QuestionOptions WHERE QuestionID = @qId`);
             questionsWithOptions.push({ ...q, options: options.recordset });
         }
 
-        return success(res, questionsWithOptions);
+        return success(res, {
+            quiz,
+            questions: questionsWithOptions
+        });
     } catch (err) {
         return error(res, "Failed to fetch quiz questions", 500, err);
     }
@@ -102,6 +116,24 @@ const submitQuiz = async (req, res) => {
 
     try {
         const pool = await getPool();
+
+        // 1. Enforce Max Attempts check
+        const quizMeta = await pool.request()
+            .input('quizId', sql.Int, quizId)
+            .query('SELECT MaxAttempts FROM Quizzes WHERE QuizID = @quizId');
+
+        const resultMeta = await pool.request()
+            .input('quizId', sql.Int, quizId)
+            .input('sId', sql.Int, studentId)
+            .query('SELECT AttemptCount FROM Quiz_Result WHERE QuizID = @quizId AND StudentID = @sId');
+
+        const maxAttempts = quizMeta.recordset[0]?.MaxAttempts || 1;
+        const currentAttempts = resultMeta.recordset[0]?.AttemptCount || 0;
+
+        if (currentAttempts >= maxAttempts) {
+            return badRequest(res, `Maximum attempts (${maxAttempts}) reached for this quiz.`);
+        }
+
         const transaction = new sql.Transaction(pool);
         await transaction.begin();
 
@@ -130,21 +162,31 @@ const submitQuiz = async (req, res) => {
                     .input('optId', sql.Int, ans.selectedOptionId)
                     .input('isCorrect', sql.Bit, isCorrect)
                     .query(`
-                        INSERT INTO StudentAnswers (QuizID, StudentID, QuestionID, SelectedOptionID, IsCorrect)
-                        VALUES (@quizId, @studentId, @qId, @optId, @isCorrect)
+                        IF EXISTS (SELECT 1 FROM StudentAnswers WHERE StudentID = @studentId AND QuestionID = @qId)
+                            UPDATE StudentAnswers
+                            SET SelectedOptionID = @optId, IsCorrect = @isCorrect
+                            WHERE StudentID = @studentId AND QuestionID = @qId
+                        ELSE
+                            INSERT INTO StudentAnswers (QuizID, StudentID, QuestionID, SelectedOptionID, IsCorrect)
+                            VALUES (@quizId, @studentId, @qId, @optId, @isCorrect)
                     `);
             }
 
-            // Record result
+            // Record result & increment attempt count
             await new sql.Request(transaction)
                 .input('quizId', sql.Int, quizId)
                 .input('studentId', sql.Int, studentId)
                 .input('score', sql.Decimal(5, 2), totalScore)
                 .query(`
                     IF EXISTS (SELECT 1 FROM Quiz_Result WHERE QuizID = @quizId AND StudentID = @studentId)
-                        UPDATE Quiz_Result SET Score = @score WHERE QuizID = @quizId AND StudentID = @studentId
+                        UPDATE Quiz_Result
+                        SET Score = @score,
+                            AttemptCount = AttemptCount + 1,
+                            LastAttemptAt = GETDATE()
+                        WHERE QuizID = @quizId AND StudentID = @studentId
                     ELSE
-                        INSERT INTO Quiz_Result (QuizID, StudentID, Score) VALUES (@quizId, @studentId, @score)
+                        INSERT INTO Quiz_Result (QuizID, StudentID, Score, AttemptCount, LastAttemptAt)
+                        VALUES (@quizId, @studentId, @score, 1, GETDATE())
                 `);
 
             await transaction.commit();

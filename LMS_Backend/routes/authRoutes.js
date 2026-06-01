@@ -3,20 +3,7 @@ const router = express.Router();
 const { register, login, updateProfile, updateProfilePicture, getMe, getUserProfile, forgotPassword, resetPassword, refreshAccessToken } = require('../controllers/authController');
 const { verifyToken } = require('../middleware/authMiddleware');
 const { validate, registerSchema, loginSchema, forgotPasswordSchema, resetPasswordSchema } = require('../middleware/validation');
-const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
-
-// Ensure profiles upload directory exists
-const profilesDir = path.join(__dirname, '../uploads/profiles');
-if (!fs.existsSync(profilesDir)) {
-    fs.mkdirSync(profilesDir, { recursive: true });
-}
-
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => cb(null, 'uploads/profiles/'),
-    filename: (req, file, cb) => cb(null, Date.now() + path.extname(file.originalname))
-});
+const { profileUpload } = require('../middleware/upload');
 
 const rateLimit = require('express-rate-limit');
 
@@ -45,18 +32,12 @@ const fileFilter = (req, file, cb) => {
     }
 };
 
-const upload = multer({ 
-    storage,
-    fileFilter,
-    limits: { fileSize: 5 * 1024 * 1024 } // 5MB max
-});
-
 router.post('/register', authLimiter, validate(registerSchema), register);
 router.post('/login', authLimiter, validate(loginSchema), login);
 router.post('/forgot-password', authLimiter, validate(forgotPasswordSchema), forgotPassword);
 router.post('/reset-password', authLimiter, validate(resetPasswordSchema), resetPassword);
 router.post('/refresh-token', authLimiter, refreshAccessToken);
-router.post('/profile-picture', verifyToken, uploadLimiter, upload.single('profilePic'), updateProfilePicture);
+router.post('/profile-picture', verifyToken, uploadLimiter, profileUpload.single('profilePic'), updateProfilePicture);
 router.get('/me', verifyToken, getMe);
 router.get('/profile/:id', verifyToken, getUserProfile);
 router.put('/update-profile', verifyToken, updateProfile);

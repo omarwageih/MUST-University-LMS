@@ -173,14 +173,19 @@ const Messages = () => {
         if (activeCourse) {
             setSending(true);
             try {
-                await apiPost('/messages/course', {
-                    courseId: activeCourse.CourseID,
-                    content: newMessage.trim()
-                });
+                const formData = new FormData();
+                formData.append('courseId', activeCourse.CourseID);
+                formData.append('content', newMessage.trim());
+
+                const res = await apiPost('/messages/course', formData);
+
                 socket.emit('send_course_message', {
                     courseId: activeCourse.CourseID,
                     content: newMessage.trim(),
-                    senderName: currentUser.FullName
+                    senderName: currentUser.FullName,
+                    senderId: currentUser.UserID,
+                    attachmentUrl: res.AttachmentURL,
+                    attachmentName: res.AttachmentName
                 });
                 setNewMessage('');
             } catch (err) {
@@ -211,15 +216,31 @@ const Messages = () => {
 
     const handleFileUpload = async (e) => {
         const file = e.target.files[0];
-        if (!file || !activeChat) return;
+        if (!file || (!activeChat && !activeCourse)) return;
 
         setSending(true);
         try {
             const formData = new FormData();
             formData.append('file', file);
-            formData.append('receiverId', activeChat.UserID);
 
-            await messageAPI.sendAttachment(formData);
+            if (activeCourse) {
+                formData.append('courseId', activeCourse.CourseID);
+                formData.append('content', ''); // Optional caption
+                const res = await apiPost('/messages/course', formData);
+
+                socket.emit('send_course_message', {
+                    courseId: activeCourse.CourseID,
+                    content: '',
+                    senderName: currentUser.FullName,
+                    senderId: currentUser.UserID,
+                    attachmentUrl: res.AttachmentURL,
+                    attachmentName: res.AttachmentName
+                });
+            } else {
+                formData.append('receiverId', activeChat.UserID);
+                await messageAPI.sendAttachment(formData);
+            }
+
             showToast(`File "${file.name}" sent successfully.`, "success");
         } catch (err) {
             console.error('File upload error:', err);
@@ -442,7 +463,22 @@ const Messages = () => {
                                                     ? 'bg-indigo-600 text-white rounded-tr-none'
                                                     : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 shadow-sm border border-slate-100 dark:border-white/5 rounded-tl-none'
                                                 }`}>
-                                                {msg.Content.startsWith('[FILE:') ? (
+                                                {msg.AttachmentURL ? (
+                                                    <a
+                                                        href={getImageUrl(msg.AttachmentURL)}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="flex items-center gap-3 hover:underline"
+                                                    >
+                                                        <div className="p-2 bg-black/10 rounded-lg">
+                                                            <Paperclip size={16} />
+                                                        </div>
+                                                        <div className="flex flex-col">
+                                                            <span className="font-bold">{msg.AttachmentName || 'Attachment'}</span>
+                                                            <span className="text-[10px] opacity-60 uppercase font-black tracking-widest">Click to Download</span>
+                                                        </div>
+                                                    </a>
+                                                ) : msg.Content.startsWith('[FILE:') ? (
                                                     (() => {
                                                         const urlMatch = msg.Content.match(/\(([^()]+)\)$/);
                                                         const nameMatch = msg.Content.match(/\[FILE:(.*?)\]/);

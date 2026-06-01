@@ -145,15 +145,40 @@ const getCourseMessages = async (req, res) => {
 const sendCourseMessage = async (req, res) => {
     try {
         const { courseId, content } = req.body;
-        const pool = await getPool();
-        await pool.request()
-            .input('cId', sql.Int, courseId)
-            .input('uId', sql.Int, req.user.id)
-            .input('content', sql.NVarChar, content)
-            .query(`INSERT INTO CourseGroupMessages (CourseID, SenderID, Content) VALUES (@cId, @uId, @content)`);
+        const senderId = req.user.id;
+        const attachmentUrl = req.file
+            ? (req.file.path && req.file.path.startsWith('http') ? req.file.path : `/uploads/messages/${req.file.filename}`)
+            : null;
+        const attachmentName = req.file ? req.file.originalname : null;
 
-        res.status(201).json({ message: "Message sent" });
+        const pool = await getPool();
+        const result = await pool.request()
+            .input('cId', sql.Int, courseId)
+            .input('uId', sql.Int, senderId)
+            .input('content', sql.NVarChar, content || '')
+            .input('attUrl', sql.NVarChar, attachmentUrl)
+            .input('attName', sql.NVarChar, attachmentName)
+            .query(`
+                INSERT INTO CourseGroupMessages (CourseID, SenderID, Content, AttachmentURL, AttachmentName)
+                OUTPUT INSERTED.*
+                VALUES (@cId, @uId, @content, @attUrl, @attName)
+            `);
+
+        const newMessage = result.recordset[0];
+
+        // Emit to course room
+        try {
+            const io = getIO();
+            io.to(`course_${courseId}`).emit('new_course_message', {
+                ...newMessage,
+                SenderName: req.user.name,
+                SenderAvatar: req.user.avatar
+            });
+        } catch (sErr) {}
+
+        res.status(201).json(newMessage);
     } catch (err) {
+        console.error('Send course message error:', err);
         res.status(500).json({ message: "Failed to send course message" });
     }
 };
@@ -216,7 +241,7 @@ const sendAttachment = async (req, res) => {
         const receiverId = parseInt(req.body.receiverId);
         const senderId = parseInt(req.user.id);
         const fileName = req.file.originalname;
-        const fileUrl = `/uploads/messages/${req.file.filename}`;
+        const fileUrl = (req.file.path && req.file.path.startsWith('http')) ? req.file.path : `/uploads/messages/${req.file.filename}`;
         
         const pool = await getPool();
         const result = await pool.request()

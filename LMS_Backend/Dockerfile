@@ -1,17 +1,22 @@
-FROM node:20-alpine
+# Base image
+FROM node:20-slim
 
-WORKDIR /app
+# Create app directory
+WORKDIR /usr/src/app
 
-# Copy package files first for better layer caching
+# Install app dependencies
 COPY package*.json ./
-RUN npm ci --only=production
+RUN npm install --production
 
-# Copy source
+# Bundle app source
 COPY . .
 
-# Create uploads directory
-RUN mkdir -p uploads/profiles uploads/submissions uploads/materials
+# Set environment variables
+ENV NODE_ENV=production
+ENV PORT=5000
 
-EXPOSE 3000
+# Expose port
+EXPOSE 5000
 
-CMD ["node", "app.js"]
+# Start command
+CMD [ "node", "app.js" ]

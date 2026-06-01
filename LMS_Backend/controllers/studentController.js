@@ -143,7 +143,9 @@ const submitAssignment = async (req, res) => {
     try {
         const { assignmentId, submissionContent } = req.body;
         const userID = req.user.id;
-        const filePath = req.file ? `/uploads/submissions/${req.file.filename}` : null;
+        const filePath = req.file
+            ? (req.file.path && req.file.path.startsWith('http') ? req.file.path : `/uploads/submissions/${req.file.filename}`)
+            : null;
 
         if (!assignmentId) return badRequest(res, "assignmentId is required.");
 
@@ -360,7 +362,84 @@ const getCourseParticipants = async (req, res) => {
     } catch (err) { return error(res, "Failed to fetch participants", 500, err); }
 };
 
+/**
+ * GET /api/student/catalog
+ */
+const getCourseCatalog = async (req, res) => {
+    try {
+        const userID = req.user.id;
+        const pool = await getPool();
+
+        const result = await pool.request()
+            .input('userID', sql.Int, userID)
+            .query(`
+                SELECT
+                    c.CourseID, c.Name, c.Description, c.Picture,
+                    u.FullName as InstructorName, u.ProfilePicture as InstructorAvatar,
+                    (SELECT COUNT(*) FROM Enrollment WHERE CourseID = c.CourseID) as StudentCount,
+                    CASE WHEN e.EnrollmentID IS NOT NULL THEN 1 ELSE 0 END as IsEnrolled
+                FROM Course c
+                LEFT JOIN Users u ON c.InstructorID = u.UserID
+                LEFT JOIN Enrollment e ON c.CourseID = e.CourseID AND e.StudentID = @userID
+                ORDER BY c.Name ASC
+            `);
+
+        return success(res, result.recordset);
+    } catch (err) {
+        return error(res, "Failed to fetch course catalog", 500, err);
+    }
+};
+
+/**
+ * POST /api/student/enroll
+ */
+const selfEnroll = async (req, res) => {
+    try {
+        const { courseId } = req.body;
+        const userID = req.user.id;
+        const pool = await getPool();
+
+        // 1. Check if course exists
+        const course = await pool.request().input('cId', sql.Int, courseId).query('SELECT Name FROM Course WHERE CourseID = @cId');
+        if (course.recordset.length === 0) return notFound(res, "Course not found.");
+
+        // 2. Check if already enrolled
+        const existing = await pool.request()
+            .input('cId', sql.Int, courseId)
+            .input('sId', sql.Int, userID)
+            .query('SELECT 1 FROM Enrollment WHERE CourseID = @cId AND StudentID = @sId');
+
+        if (existing.recordset.length > 0) return badRequest(res, "You are already enrolled in this course.");
+
+        // 3. Enroll
+        const transaction = new sql.Transaction(pool);
+        await transaction.begin();
+        try {
+            const request = new sql.Request(transaction);
+            await request.input('sId', sql.Int, userID).input('cId', sql.Int, courseId)
+                .query('INSERT INTO Enrollment (StudentID, CourseID) VALUES (@sId, @cId)');
+
+            await request.query(`
+                IF NOT EXISTS (SELECT 1 FROM Course_Grades WHERE StudentID = @sId AND CourseID = @cId)
+                INSERT INTO Course_Grades (StudentID, CourseID) VALUES (@sId, @cId)
+            `);
+
+            await transaction.commit();
+            const { logAudit } = require('../utils/helpers');
+            await logAudit(userID, 'SELF_ENROLL', `Self-enrolled in course: ${course.recordset[0].Name}`, req.ip);
+
+            return success(res, { message: "Enrolled successfully" });
+        } catch (txErr) {
+            await transaction.rollback();
+            throw txErr;
+        }
+    } catch (err) {
+        return error(res, "Enrollment failed", 500, err);
+    }
+};
+
 module.exports = {
     getDashboard, getMyCourses, getCourseContent, getAssignments, submitAssignment,
-    getGrades, getCourseMaterials, getCourseAnnouncements, getCalendarEvents, updateProfile, getCourseParticipants
+    getGrades, getCourseMaterials, getCourseAnnouncements, getCalendarEvents, updateProfile, getCourseParticipants,
+    getCourseCatalog, selfEnroll
 };

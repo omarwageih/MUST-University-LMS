@@ -41,9 +41,9 @@ const initSocket = (server) => {
         });
 
         socket.on('send_course_message', async (data) => {
-            const { courseId, content, senderName } = data;
+            const { courseId, content, senderName, senderId } = data;
             io.to(`course_${courseId}`).emit('receive_course_message', {
-                SenderID: socket.userId,
+                SenderID: senderId || socket.userId,
                 SenderName: senderName || 'User',
                 Content: content,
                 CreatedAt: new Date().toISOString()

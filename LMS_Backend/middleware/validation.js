@@ -54,6 +54,10 @@ const enrollStudentSchema = z.object({
     courseId: z.union([z.string(), z.number()])
 });
 
+const selfEnrollSchema = z.object({
+    courseId: z.union([z.string(), z.number()])
+});
+
 const assignAssistantSchema = z.object({
     assistantId: z.union([z.string(), z.number()]),
     courseId: z.union([z.string(), z.number()])
@@ -196,5 +200,6 @@ module.exports = {
     instructorGradeSubmissionSchema, assistantGradeSubmissionSchema, idParamSchema,
     updateProfileSchema,
     addQuizQuestionSchema, submitQuizSchema,
+    selfEnrollSchema,
     validate, validateParams
 };

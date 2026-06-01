@@ -218,7 +218,11 @@ const login = async (req, res) => {
 const updateProfilePicture = async (req, res) => {
     try {
         if (!req.file) return res.status(400).json({ message: "No file uploaded" });
-        const filePath = `/uploads/profiles/${req.file.filename}`;
+
+        // Use path for Cloudinary, filename for local storage fallback
+        const filePath = (req.file.path && req.file.path.startsWith('http'))
+            ? req.file.path
+            : `/uploads/profiles/${req.file.filename}`;
         
         const pool = await getPool();
         await pool.request()

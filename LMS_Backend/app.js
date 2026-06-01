@@ -58,6 +58,7 @@ const instructorRoutes = require('./routes/instructorRoutes');
 const assistantRoutes = require('./routes/assistantRoutes');
 const studentRoutes = require('./routes/studentRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
+const searchRoutes = require('./routes/searchRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 const messageRoutes = require('./routes/messageRoutes');
 const quizRoutes = require('./routes/quizRoutes');
@@ -68,6 +69,7 @@ app.use('/api/instructor', instructorRoutes);
 app.use('/api/assistant', assistantRoutes);
 app.use('/api/student', studentRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/search', searchRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/messages', messageRoutes);
 app.use('/api/quizzes', quizRoutes);
@@ -134,4 +136,12 @@ server.listen(process.env.PORT || 3000, async () => {
     // Run expanded project migrations
     const migrateQuizEngine = require('./database/migrate_quiz_engine');
     await migrateQuizEngine();
+
+    // Run advanced quiz controls migrations
+    const migrateAdvancedQuiz = require('./database/migrate_advanced_quiz');
+    await migrateAdvancedQuiz();
+
+    // Run course messaging attachments migrations
+    const migrateCourseAttachments = require('./database/migrate_course_attachments');
+    await migrateCourseAttachments();
 });

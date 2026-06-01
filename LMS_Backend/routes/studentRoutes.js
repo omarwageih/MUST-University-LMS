@@ -13,7 +13,9 @@ const {
     getCourseAnnouncements,
     getCalendarEvents,
     updateProfile,
-    getCourseParticipants
+    getCourseParticipants,
+    getCourseCatalog,
+    selfEnroll
 } = require('../controllers/studentController');
 const { getCourseAttendance, getCourseQuizzes } = require('../controllers/courseController');
 const { getDiscussionPosts, createDiscussionPost, getDiscussionReplies, createDiscussionReply } = require('../controllers/discussionController');
@@ -21,7 +23,7 @@ const { getDiscussionPosts, createDiscussionPost, getDiscussionReplies, createDi
 // All routes require Student role
 router.use(verifyToken, requireRole('Student'));
 
-const { validate, updateProfileSchema } = require('../middleware/validation');
+const { validate, updateProfileSchema, selfEnrollSchema } = require('../middleware/validation');
 
 // ===== Dashboard & Profile =====
 router.get('/dashboard', getDashboard);
@@ -29,6 +31,8 @@ router.put('/profile', validate(updateProfileSchema), updateProfile);
 
 // ===== Courses =====
 router.get('/courses', getMyCourses);
+router.get('/catalog', getCourseCatalog);
+router.post('/enroll', validate(selfEnrollSchema), selfEnroll);
 router.get('/courses/:courseId/content', requireEnrollment, getCourseContent);
 router.get('/courses/:courseId/materials', requireEnrollment, getCourseMaterials);
 router.get('/courses/:courseId/announcements', requireEnrollment, getCourseAnnouncements);
