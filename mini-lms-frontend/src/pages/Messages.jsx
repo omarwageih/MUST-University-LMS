@@ -15,7 +15,9 @@ const Messages = () => {
     const location = useLocation();
     const navigate = useNavigate();
     const [conversations, setConversations] = useState([]);
+    const [courseGroups, setCourseGroups] = useState([]);
     const [activeChat, setActiveChat] = useState(null);
+    const [activeCourse, setActiveCourse] = useState(null);
     const [messages, setMessages] = useState([]);
     const [newMessage, setNewMessage] = useState('');
     const [loading, setLoading] = useState(true);
@@ -47,14 +49,25 @@ const Messages = () => {
 
     useEffect(() => {
         fetchConversations();
+        fetchCourses();
     }, []);
 
     useEffect(() => {
         if (activeChat) {
+            setActiveCourse(null);
             fetchMessages(activeChat.UserID);
             if (isMobileView) setShowChat(true);
         }
     }, [activeChat, isMobileView]);
+
+    useEffect(() => {
+        if (activeCourse && socket) {
+            setActiveChat(null);
+            fetchCourseMessages(activeCourse.CourseID);
+            socket.emit('join_course', activeCourse.CourseID);
+            if (isMobileView) setShowChat(true);
+        }
+    }, [activeCourse, isMobileView, socket]);
 
     // Handle incoming navigation state (Direct Message from other pages)
     useEffect(() => {
@@ -101,15 +114,36 @@ const Messages = () => {
                 fetchConversations();
             });
 
+            socket.on('receive_course_message', (message) => {
+                if (activeCourse && (message.CourseID === activeCourse.CourseID || activeCourse)) {
+                    setMessages(prev => [...prev, message]);
+                }
+            });
+
             return () => {
                 socket.off('receive_message');
                 socket.off('message_sent');
+                socket.off('receive_course_message');
             };
         }
     }, [socket, activeChat]);
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    };
+
+    const fetchCourses = async () => {
+        try {
+            const data = await apiGet('/student/courses');
+            setCourseGroups(data || []);
+        } catch (err) { console.error(err); }
+    };
+
+    const fetchCourseMessages = async (courseId) => {
+        try {
+            const data = await apiGet(`/messages/course/${courseId}`);
+            setMessages(data || []);
+        } catch (err) { console.error(err); }
     };
 
     const fetchConversations = async () => {
@@ -134,7 +168,31 @@ const Messages = () => {
 
     const handleSendMessage = async (e) => {
         e.preventDefault();
-        if (!newMessage.trim() || !activeChat || sending) return;
+        if (!newMessage.trim() || sending) return;
+
+        if (activeCourse) {
+            setSending(true);
+            try {
+                await apiPost('/messages/course', {
+                    courseId: activeCourse.CourseID,
+                    content: newMessage.trim()
+                });
+                socket.emit('send_course_message', {
+                    courseId: activeCourse.CourseID,
+                    content: newMessage.trim(),
+                    senderName: currentUser.FullName
+                });
+                setNewMessage('');
+            } catch (err) {
+                console.error(err);
+                showToast("Failed to send group message", "error");
+            } finally {
+                setSending(false);
+            }
+            return;
+        }
+
+        if (!activeChat) return;
 
         setSending(true);
         try {
@@ -226,6 +284,31 @@ const Messages = () => {
                 </div>
 
                 <div className="flex-1 overflow-y-auto px-4 pb-4 space-y-2">
+                    {courseGroups.length > 0 && (
+                        <div className="mb-6">
+                            <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-3 ml-2">Course Groups</h3>
+                            {courseGroups.map(course => (
+                                <button
+                                    key={course.CourseID}
+                                    onClick={() => setActiveCourse(course)}
+                                    className={`w-full p-4 rounded-3xl flex items-center gap-4 transition-all mb-2 ${activeCourse?.CourseID === course.CourseID
+                                        ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20'
+                                        : 'hover:bg-slate-50 dark:hover:bg-white/5 text-slate-600 dark:text-slate-400'
+                                    }`}
+                                >
+                                    <div className="w-10 h-10 rounded-xl bg-blue-100 dark:bg-blue-500/10 text-blue-600 flex items-center justify-center font-black">
+                                        #
+                                    </div>
+                                    <div className="text-left">
+                                        <h4 className="font-bold text-sm truncate">{course.CourseName}</h4>
+                                        <p className="text-[10px] opacity-60">Group Chat</p>
+                                    </div>
+                                </button>
+                            ))}
+                        </div>
+                    )}
+
+                    <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-3 ml-2">Direct Messages</h3>
                     {filteredConversations.length === 0 ? (
                         <div className="flex flex-col items-center justify-center py-10 text-center space-y-3 opacity-50">
                             <Clock size={32} />
@@ -281,21 +364,23 @@ const Messages = () => {
 
             {/* Main Chat Area */}
             <div className={`flex-1 flex flex-col bg-slate-50 dark:bg-slate-950/30 ${isMobileView && !showChat ? 'hidden' : 'flex'}`}>
-                {activeChat ? (
+                {(activeChat || activeCourse) ? (
                     <>
                         {/* Chat Header */}
                         <div className="h-20 px-6 flex items-center justify-between bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-white/5">
                             <div
-                                onClick={() => navigate(`/profile/${activeChat.UserID}`)}
-                                className="flex items-center gap-4 cursor-pointer hover:opacity-80 transition-opacity"
+                                onClick={() => activeChat && navigate(`/profile/${activeChat.UserID}`)}
+                                className={`flex items-center gap-4 ${activeChat ? 'cursor-pointer hover:opacity-80' : ''} transition-opacity`}
                             >
                                 {isMobileView && (
                                     <button onClick={(e) => { e.stopPropagation(); setShowChat(false); }} className="p-2 -ml-2 text-slate-500">
                                         <ArrowLeft size={20} />
                                     </button>
                                 )}
-                                <div className="w-10 h-10 rounded-xl overflow-hidden bg-slate-200 dark:bg-slate-700">
-                                    {activeChat.ProfilePicture ? (
+                                <div className="w-10 h-10 rounded-xl overflow-hidden bg-slate-200 dark:bg-slate-700 flex items-center justify-center">
+                                    {activeCourse ? (
+                                        <span className="font-black text-blue-600">#</span>
+                                    ) : activeChat?.ProfilePicture ? (
                                         <img
                                             src={getImageUrl(activeChat.ProfilePicture)}
                                             alt={activeChat.FullName}
@@ -303,13 +388,17 @@ const Messages = () => {
                                         />
                                     ) : (
                                         <div className="w-full h-full flex items-center justify-center font-bold">
-                                            {activeChat.FullName.charAt(0)}
+                                            {activeChat?.FullName.charAt(0)}
                                         </div>
                                     )}
                                 </div>
                                 <div>
-                                    <h4 className="font-bold text-sm text-slate-900 dark:text-white leading-none mb-1">{activeChat.FullName}</h4>
-                                    <span className="text-[10px] font-black uppercase tracking-widest text-indigo-600 dark:text-indigo-400">{activeChat.UserType}</span>
+                                    <h4 className="font-bold text-sm text-slate-900 dark:text-white leading-none mb-1">
+                                        {activeCourse ? activeCourse.CourseName : activeChat?.FullName}
+                                    </h4>
+                                    <span className="text-[10px] font-black uppercase tracking-widest text-indigo-600 dark:text-indigo-400">
+                                        {activeCourse ? 'Group Chat' : activeChat?.UserType}
+                                    </span>
                                 </div>
                             </div>
                             <div className="flex items-center gap-2">
@@ -346,6 +435,9 @@ const Messages = () => {
                                 return (
                                     <div key={msg.MessageID || i} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
                                         <div className={`max-w-[75%] space-y-1 ${isMe ? 'items-end' : 'items-start'}`}>
+                                            {!isMe && activeCourse && (
+                                                <span className="text-[10px] font-black text-slate-400 ml-2">{msg.SenderName}</span>
+                                            )}
                                             <div className={`p-4 rounded-3xl text-sm ${isMe
                                                     ? 'bg-indigo-600 text-white rounded-tr-none'
                                                     : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 shadow-sm border border-slate-100 dark:border-white/5 rounded-tl-none'

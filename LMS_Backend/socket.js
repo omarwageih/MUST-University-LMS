@@ -30,7 +30,24 @@ const initSocket = (server) => {
         // This allows the server to send targeted notifications to specific users
         socket.on("join", (userId) => {
             socket.join(`user_${userId}`);
+            socket.userId = userId;
             console.log(`User ${userId} joined their room`);
+        });
+
+        // Course group chat
+        socket.on('join_course', (courseId) => {
+            socket.join(`course_${courseId}`);
+            console.log(`User joining course room: course_${courseId}`);
+        });
+
+        socket.on('send_course_message', async (data) => {
+            const { courseId, content, senderName } = data;
+            io.to(`course_${courseId}`).emit('receive_course_message', {
+                SenderID: socket.userId,
+                SenderName: senderName || 'User',
+                Content: content,
+                CreatedAt: new Date().toISOString()
+            });
         });
 
         // Handle client disconnection

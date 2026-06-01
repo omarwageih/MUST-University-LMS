@@ -113,6 +113,26 @@ const assistantGradeSubmissionSchema = z.object({
     score: z.union([z.string(), z.number()])
 });
 
+// ===== Quiz Schemas =====
+const addQuizQuestionSchema = z.object({
+    quizId: z.union([z.string(), z.number()]),
+    text: z.string().min(1),
+    type: z.string().optional(),
+    points: z.union([z.string(), z.number()]).optional(),
+    options: z.array(z.object({
+        text: z.string().min(1),
+        isCorrect: z.boolean()
+    })).min(2)
+});
+
+const submitQuizSchema = z.object({
+    quizId: z.union([z.string(), z.number()]),
+    answers: z.array(z.object({
+        questionId: z.union([z.string(), z.number()]),
+        selectedOptionId: z.union([z.string(), z.number()])
+    }))
+});
+
 const createAnnouncementSchema = z.object({
     courseId: z.union([z.string(), z.number()]),
     title: z.string().min(1).max(200),
@@ -175,5 +195,6 @@ module.exports = {
     createCourseSchema, addWeekSchema, addMaterialSchema, addLectureSchema, createAssignmentSchema, updateAssignmentSchema, createAnnouncementSchema,
     instructorGradeSubmissionSchema, assistantGradeSubmissionSchema, idParamSchema,
     updateProfileSchema,
+    addQuizQuestionSchema, submitQuizSchema,
     validate, validateParams
 };

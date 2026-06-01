@@ -15,5 +15,7 @@ router.get('/conversations', getChatList);
 router.get('/:userId', getConversation);
 router.post('/', sendMessage);
 router.post('/attachment', messageUpload.single('file'), sendAttachment);
+router.get('/course/:courseId', verifyToken, messageController.getCourseMessages);
+router.post('/course', verifyToken, messageController.sendCourseMessage);
 
 module.exports = router;

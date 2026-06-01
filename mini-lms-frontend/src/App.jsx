@@ -36,6 +36,8 @@ import Calendar from './pages/Calendar';
 import Discussions from './pages/Discussions';
 import Analytics from './pages/Analytics';
 import Messages from './pages/Messages';
+import QuizTaker from './pages/QuizTaker';
+import QuizBuilder from './pages/instructor/QuizBuilder';
 
 // Assistant Pages
 import AssistantDashboard from './pages/assistant/AssistantDashboard';
@@ -125,6 +127,7 @@ const SocketWrapper = ({ toggleTheme, isDarkMode, location }) => {
                             <Route path="/calendar" element={<ProtectedRoute allowedRoles={['Student']}><PageWrapper><Calendar /></PageWrapper></ProtectedRoute>} />
                             <Route path="/discussions/:courseId" element={<ProtectedRoute allowedRoles={['Student', 'Instructor', 'Assistant']}><PageWrapper><Discussions /></PageWrapper></ProtectedRoute>} />
                             <Route path="/analytics" element={<ProtectedRoute allowedRoles={['Student']}><PageWrapper><Analytics /></PageWrapper></ProtectedRoute>} />
+                            <Route path="/quiz/:id" element={<ProtectedRoute allowedRoles={['Student']}><PageWrapper><QuizTaker /></PageWrapper></ProtectedRoute>} />
 
                             {/* Assistant Routes */}
                             <Route path="/assistant" element={<ProtectedRoute allowedRoles={['Assistant']}><PageWrapper><AssistantDashboard /></PageWrapper></ProtectedRoute>} />
@@ -141,6 +144,7 @@ const SocketWrapper = ({ toggleTheme, isDarkMode, location }) => {
                             <Route path="/instructor/my-courses" element={<ProtectedRoute allowedRoles={['Instructor']}><PageWrapper><InstructorCourses /></PageWrapper></ProtectedRoute>} />
                             <Route path="/instructor/courses/:id" element={<ProtectedRoute allowedRoles={['Instructor']}><PageWrapper><InstructorCourseDetails /></PageWrapper></ProtectedRoute>} />
                             <Route path="/instructor/submissions" element={<ProtectedRoute allowedRoles={['Instructor']}><PageWrapper><InstructorSubmissions /></PageWrapper></ProtectedRoute>} />
+                            <Route path="/instructor/quiz-builder/:id" element={<ProtectedRoute allowedRoles={['Instructor']}><PageWrapper><QuizBuilder /></PageWrapper></ProtectedRoute>} />
 
                             {/* Common */}
                             <Route path="/profile" element={<PageWrapper><Profile /></PageWrapper>} />

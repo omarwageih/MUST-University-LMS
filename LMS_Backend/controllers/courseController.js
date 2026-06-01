@@ -1,6 +1,7 @@
 const { sql, getPool } = require('../config/db');
 const { createNotification, logAudit, deleteFile, checkCourseAccess } = require('../utils/helpers');
 const { success, error, badRequest, forbidden, notFound } = require('../utils/responseHandler');
+const { Parser } = require('json2csv');
 
 
 
@@ -608,6 +609,35 @@ const markAttendance = async (req, res) => {
     } catch (err) { return error(res, "Failed to mark attendance", 500, err); }
 };
 
+const exportGrades = async (req, res) => {
+    const { courseId } = req.params;
+    try {
+        const pool = await getPool();
+        const result = await pool.request()
+            .input('cId', sql.Int, courseId)
+            .query(`
+                SELECT u.FullName, u.Email, cg.AssignmentTotal, cg.QuizTotal, cg.AttendanceTotal, cg.FinalGrade
+                FROM Course_Grades cg
+                JOIN Users u ON cg.StudentID = u.UserID
+                WHERE cg.CourseID = @cId
+            `);
+
+        if (result.recordset.length === 0) {
+            return badRequest(res, "No grades found for this course.");
+        }
+
+        const fields = ['FullName', 'Email', 'AssignmentTotal', 'QuizTotal', 'AttendanceTotal', 'FinalGrade'];
+        const json2csvParser = new Parser({ fields });
+        const csv = json2csvParser.parse(result.recordset);
+
+        res.header('Content-Type', 'text/csv');
+        res.attachment(`course_${courseId}_grades.csv`);
+        return res.send(csv);
+    } catch (err) {
+        return error(res, "Failed to export grades", 500, err);
+    }
+};
+
 const getCourseQuizzes = async (req, res) => {
     const { courseId } = req.params;
     try {
@@ -693,5 +723,5 @@ module.exports = {
     getAnnouncements, createAnnouncement, deleteAnnouncement,
     getCourseParticipants, getCourseGrades, unenrollParticipant,
     getCourseAttendance, markAttendance, getCourseQuizzes,
-    updateCourseWeights
+    updateCourseWeights, exportGrades
 };

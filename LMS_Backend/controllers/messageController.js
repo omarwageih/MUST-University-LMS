@@ -123,6 +123,41 @@ const getConversation = async (req, res) => {
 /**
  * Get list of all conversations for the current user
  */
+const getCourseMessages = async (req, res) => {
+    try {
+        const { courseId } = req.params;
+        const pool = await getPool();
+        const result = await pool.request()
+            .input('cId', sql.Int, courseId)
+            .query(`
+                SELECT cgm.*, u.FullName as SenderName, u.ProfilePicture as SenderAvatar
+                FROM CourseGroupMessages cgm
+                JOIN Users u ON cgm.SenderID = u.UserID
+                WHERE cgm.CourseID = @cId
+                ORDER BY cgm.CreatedAt ASC
+            `);
+        res.json(result.recordset);
+    } catch (err) {
+        res.status(500).json({ message: "Failed to fetch course messages" });
+    }
+};
+
+const sendCourseMessage = async (req, res) => {
+    try {
+        const { courseId, content } = req.body;
+        const pool = await getPool();
+        await pool.request()
+            .input('cId', sql.Int, courseId)
+            .input('uId', sql.Int, req.user.id)
+            .input('content', sql.NVarChar, content)
+            .query(`INSERT INTO CourseGroupMessages (CourseID, SenderID, Content) VALUES (@cId, @uId, @content)`);
+
+        res.status(201).json({ message: "Message sent" });
+    } catch (err) {
+        res.status(500).json({ message: "Failed to send course message" });
+    }
+};
+
 const getChatList = async (req, res) => {
     try {
         const myId = parseInt(req.user.id);
@@ -216,5 +251,7 @@ module.exports = {
     sendMessage,
     getConversation,
     getChatList,
-    sendAttachment
+    sendAttachment,
+    getCourseMessages,
+    sendCourseMessage
 };

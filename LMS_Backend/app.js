@@ -9,6 +9,10 @@ const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const path = require('path');
+const morgan = require('morgan');
+const logger = require('./utils/logger');
+const swaggerJsdoc = require('swagger-jsdoc');
+const swaggerUi = require('swagger-ui-express');
 
 // Initialize Express application
 const app = express();
@@ -29,15 +33,8 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Request Logging Middleware: Logs the method, URL, status code, and duration of each request
-app.use((req, res, next) => {
-    const start = Date.now();
-    res.on('finish', () => {
-        const duration = Date.now() - start;
-        console.log(`${req.method} ${req.originalUrl} ${res.statusCode} - ${duration}ms`);
-    });
-    next();
-});
+// Request Logging Middleware
+app.use(morgan('combined', { stream: { write: message => logger.info(message.trim()) } }));
 
 // ===== Rate Limiting (Optional/Disabled for Dev) =====
 // Prevents brute force and DoS attacks by limiting requests per IP
@@ -63,6 +60,7 @@ const studentRoutes = require('./routes/studentRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 const messageRoutes = require('./routes/messageRoutes');
+const quizRoutes = require('./routes/quizRoutes');
 
 // Mount routes to the API path
 app.use('/api/auth', authRoutes);
@@ -72,6 +70,28 @@ app.use('/api/student', studentRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/messages', messageRoutes);
+app.use('/api/quizzes', quizRoutes);
+
+// ===== Swagger Documentation =====
+const swaggerOptions = {
+    definition: {
+        openapi: '3.0.0',
+        info: {
+            title: 'Mini LMS API',
+            version: '1.0.0',
+            description: 'API Documentation for Mini LMS',
+        },
+        servers: [
+            {
+                url: `http://localhost:${process.env.PORT || 3000}`,
+            },
+        ],
+    },
+    apis: ['./routes/*.js', './controllers/*.js'], // Path to the API docs
+};
+
+const swaggerSpec = swaggerJsdoc(swaggerOptions);
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 // Global Error Handler
 app.use((err, req, res, next) => {
@@ -110,4 +130,8 @@ initSocket(server);
 server.listen(process.env.PORT || 3000, async () => {
     console.log(`Server running on port ${process.env.PORT || 3000}`);
     await runMigrations(); // Ensures the database schema is up-to-date
+
+    // Run expanded project migrations
+    const migrateQuizEngine = require('./database/migrate_quiz_engine');
+    await migrateQuizEngine();
 });

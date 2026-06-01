@@ -97,7 +97,28 @@ const register = async (req, res) => {
 };
 
 
-// ================= LOGIN =================
+/**
+ * @openapi
+ * /api/auth/login:
+ *   post:
+ *     summary: User login
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [email, password]
+ *             properties:
+ *               email:
+ *                 type: string
+ *               password:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Login successful
+ */
 const login = async (req, res) => {
     try {
         const { email, password } = req.body;
