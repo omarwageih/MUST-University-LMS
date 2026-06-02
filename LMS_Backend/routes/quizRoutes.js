@@ -18,6 +18,6 @@ router.delete('/questions/:id', verifyToken, requireRole('Instructor', 'Assistan
 /**
  * Student Submission
  */
-router.post('/submit', verifyToken, requireRole('Student'), validate(submitQuizSchema), quizController.submitQuiz);
+router.post('/submit', verifyToken, requireRole('Student'), requireEnrollment, validate(submitQuizSchema), quizController.submitQuiz);
 
 module.exports = router;

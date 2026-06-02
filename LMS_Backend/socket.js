@@ -41,11 +41,13 @@ const initSocket = (server) => {
         });
 
         socket.on('send_course_message', async (data) => {
-            const { courseId, content, senderName, senderId } = data;
+            const { courseId, content, senderName, senderId, AttachmentURL, AttachmentName } = data;
             io.to(`course_${courseId}`).emit('receive_course_message', {
                 SenderID: senderId || socket.userId,
                 SenderName: senderName || 'User',
                 Content: content,
+                AttachmentURL: AttachmentURL || null,
+                AttachmentName: AttachmentName || null,
                 CreatedAt: new Date().toISOString()
             });
         });

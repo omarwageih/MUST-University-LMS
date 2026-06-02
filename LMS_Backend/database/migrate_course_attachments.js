@@ -26,6 +26,7 @@ const migrateCourseAttachments = async () => {
         console.log('✅ Course Messaging Attachments migrations completed.');
     } catch (err) {
         console.error('Migration error:', err.message);
+        throw err;
     }
 };
 

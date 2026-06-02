@@ -40,6 +40,11 @@ jobs:
       - name: Build
         run: npm run build
         working-directory: ./mini-lms-frontend
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: ./mini-lms-frontend/dist
 
   docker-build:
     needs: [backend-test, frontend-build]

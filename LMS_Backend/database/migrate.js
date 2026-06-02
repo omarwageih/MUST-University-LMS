@@ -244,7 +244,7 @@ const runMigrations = async () => {
         console.log('All migrations completed successfully.');
     } catch (err) {
         console.error('Migration error:', err.message);
-        // Don't crash the server — just log the error
+        throw err;
     }
 };
 

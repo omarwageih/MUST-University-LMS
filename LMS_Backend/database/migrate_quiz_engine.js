@@ -74,6 +74,7 @@ const migrateQuizEngine = async () => {
         console.log('✅ Expanded Project migrations completed.');
     } catch (err) {
         console.error('Migration error:', err.message);
+        throw err;
     }
 };
 

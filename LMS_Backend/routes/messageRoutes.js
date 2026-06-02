@@ -19,13 +19,13 @@ router.get('/course/:courseId', (req, res, next) => {
     return requireEnrollment(req, res, next);
 }, messageController.getCourseMessages);
 
-router.post('/course', (req, res, next) => {
+router.post('/course', messageUpload.single('file'), (req, res, next) => {
     // Middleware needs to extract courseId from body since it's a POST
     req.params.courseId = req.body.courseId;
     if (req.user.type === 'Instructor' || req.user.type === 'Assistant') {
         return requireCourseOwner(req, res, next);
     }
     return requireEnrollment(req, res, next);
-}, messageUpload.single('file'), messageController.sendCourseMessage);
+}, messageController.sendCourseMessage);
 
 module.exports = router;

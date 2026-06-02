@@ -141,17 +141,23 @@ const submitQuiz = async (req, res) => {
             let totalScore = 0;
 
             for (const ans of answers) {
-                // Check if correct
+                // Check if correct AND ensure question belongs to this quiz
                 const check = await pool.request()
                     .input('optId', sql.Int, ans.selectedOptionId)
                     .input('qId', sql.Int, ans.questionId)
+                    .input('quizId', sql.Int, quizId)
                     .query(`
-                        SELECT IsCorrect, (SELECT Points FROM QuizQuestions WHERE QuestionID = @qId) as Points
-                        FROM QuestionOptions
-                        WHERE OptionID = @optId AND QuestionID = @qId
+                        SELECT qo.IsCorrect, qq.Points
+                        FROM QuestionOptions qo
+                        JOIN QuizQuestions qq ON qo.QuestionID = qq.QuestionID
+                        WHERE qo.OptionID = @optId AND qo.QuestionID = @qId AND qq.QuizID = @quizId
                     `);
 
-                const isCorrect = check.recordset[0]?.IsCorrect || false;
+                if (check.recordset.length === 0) {
+                    throw new Error(`Invalid answer provided: Question ${ans.questionId} does not belong to Quiz ${quizId} or Option ${ans.selectedOptionId} is invalid.`);
+                }
+
+                const isCorrect = check.recordset[0].IsCorrect || false;
                 const points = check.recordset[0]?.Points || 0;
                 if (isCorrect) totalScore += points;
 

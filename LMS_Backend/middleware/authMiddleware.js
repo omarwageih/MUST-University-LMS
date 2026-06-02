@@ -117,6 +117,14 @@ const requireEnrollment = async (req, res, next) => {
             courseId = assignResult.recordset[0]?.CourseID;
         }
 
+        if (!courseId && (req.params.quizId || req.body.quizId)) {
+            const quizId = req.params.quizId || req.body.quizId;
+            const quizRes = await pool.request()
+                .input('id', sql.Int, quizId)
+                .query('SELECT CourseID FROM Quizzes WHERE QuizID = @id');
+            courseId = quizRes.recordset[0]?.CourseID;
+        }
+
         if (!courseId) {
             return res.status(400).json({ message: "Course ID is required for enrollment check." });
         }

@@ -41,6 +41,7 @@ const migrateAdvancedQuizControls = async () => {
         console.log('✅ Advanced Quiz Controls migrations completed.');
     } catch (err) {
         console.error('Migration error:', err.message);
+        throw err;
     }
 };
 
