@@ -117,6 +117,14 @@ const requireEnrollment = async (req, res, next) => {
             courseId = assignResult.recordset[0]?.CourseID;
         }
 
+        if (!courseId && (req.params.quizId || req.body.quizId)) {
+            const quizId = req.params.quizId || req.body.quizId;
+            const quizRes = await pool.request()
+                .input('id', sql.Int, quizId)
+                .query('SELECT CourseID FROM Quizzes WHERE QuizID = @id');
+            courseId = quizRes.recordset[0]?.CourseID;
+        }
+
         if (!courseId) {
             return res.status(400).json({ message: "Course ID is required for enrollment check." });
         }
@@ -174,6 +182,14 @@ const requireCourseOwner = async (req, res, next) => {
                 }
             } else if (req.params.id && req.originalUrl.includes('lectures')) {
                 const dbRes = await pool.request().input('id', sql.Int, req.params.id).query('SELECT CourseID FROM Lecture WHERE LectureID = @id');
+                courseId = dbRes.recordset[0]?.CourseID;
+            } else if (req.body.quizId || (req.params.quizId && req.originalUrl.includes('questions')) || (req.params.id && req.originalUrl.includes('questions'))) {
+                const id = req.body.quizId || req.params.quizId || req.params.id;
+                const dbRes = await pool.request().input('id', sql.Int, id).query(`
+                    SELECT CourseID FROM Quizzes WHERE QuizID = @id
+                    UNION
+                    SELECT q.CourseID FROM QuizQuestions qq JOIN Quizzes q ON qq.QuizID = q.QuizID WHERE qq.QuestionID = @id
+                `);
                 courseId = dbRes.recordset[0]?.CourseID;
             }
         }

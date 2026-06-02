@@ -54,6 +54,10 @@ const enrollStudentSchema = z.object({
     courseId: z.union([z.string(), z.number()])
 });
 
+const selfEnrollSchema = z.object({
+    courseId: z.union([z.string(), z.number()])
+});
+
 const assignAssistantSchema = z.object({
     assistantId: z.union([z.string(), z.number()]),
     courseId: z.union([z.string(), z.number()])
@@ -111,6 +115,26 @@ const instructorGradeSubmissionSchema = z.object({
 const assistantGradeSubmissionSchema = z.object({
     submissionId: z.union([z.string(), z.number()]),
     score: z.union([z.string(), z.number()])
+});
+
+// ===== Quiz Schemas =====
+const addQuizQuestionSchema = z.object({
+    quizId: z.union([z.string(), z.number()]),
+    text: z.string().min(1),
+    type: z.string().optional(),
+    points: z.union([z.string(), z.number()]).optional(),
+    options: z.array(z.object({
+        text: z.string().min(1),
+        isCorrect: z.boolean()
+    })).min(2)
+});
+
+const submitQuizSchema = z.object({
+    quizId: z.union([z.string(), z.number()]),
+    answers: z.array(z.object({
+        questionId: z.union([z.string(), z.number()]),
+        selectedOptionId: z.union([z.string(), z.number()])
+    }))
 });
 
 const createAnnouncementSchema = z.object({
@@ -175,5 +199,7 @@ module.exports = {
     createCourseSchema, addWeekSchema, addMaterialSchema, addLectureSchema, createAssignmentSchema, updateAssignmentSchema, createAnnouncementSchema,
     instructorGradeSubmissionSchema, assistantGradeSubmissionSchema, idParamSchema,
     updateProfileSchema,
+    addQuizQuestionSchema, submitQuizSchema,
+    selfEnrollSchema,
     validate, validateParams
 };

@@ -123,6 +123,66 @@ const getConversation = async (req, res) => {
 /**
  * Get list of all conversations for the current user
  */
+const getCourseMessages = async (req, res) => {
+    try {
+        const { courseId } = req.params;
+        const pool = await getPool();
+        const result = await pool.request()
+            .input('cId', sql.Int, courseId)
+            .query(`
+                SELECT cgm.*, u.FullName as SenderName, u.ProfilePicture as SenderAvatar
+                FROM CourseGroupMessages cgm
+                JOIN Users u ON cgm.SenderID = u.UserID
+                WHERE cgm.CourseID = @cId
+                ORDER BY cgm.CreatedAt ASC
+            `);
+        res.json(result.recordset);
+    } catch (err) {
+        res.status(500).json({ message: "Failed to fetch course messages" });
+    }
+};
+
+const sendCourseMessage = async (req, res) => {
+    try {
+        const { courseId, content } = req.body;
+        const senderId = req.user.id;
+        const attachmentUrl = req.file
+            ? (req.file.path && req.file.path.startsWith('http') ? req.file.path : `/uploads/messages/${req.file.filename}`)
+            : null;
+        const attachmentName = req.file ? req.file.originalname : null;
+
+        const pool = await getPool();
+        const result = await pool.request()
+            .input('cId', sql.Int, courseId)
+            .input('uId', sql.Int, senderId)
+            .input('content', sql.NVarChar, content || '')
+            .input('attUrl', sql.NVarChar, attachmentUrl)
+            .input('attName', sql.NVarChar, attachmentName)
+            .query(`
+                INSERT INTO CourseGroupMessages (CourseID, SenderID, Content, AttachmentURL, AttachmentName)
+                OUTPUT INSERTED.*
+                VALUES (@cId, @uId, @content, @attUrl, @attName)
+            `);
+
+        const newMessage = result.recordset[0];
+
+        // Emit to course room
+        try {
+            const io = getIO();
+            io.to(`course_${courseId}`).emit('new_course_message', {
+                ...newMessage,
+                SenderName: req.user.name,
+                SenderAvatar: req.user.avatar
+            });
+        } catch (sErr) {}
+
+        res.status(201).json(newMessage);
+    } catch (err) {
+        console.error('Send course message error:', err);
+        res.status(500).json({ message: "Failed to send course message" });
+    }
+};
+
 const getChatList = async (req, res) => {
     try {
         const myId = parseInt(req.user.id);
@@ -181,7 +241,7 @@ const sendAttachment = async (req, res) => {
         const receiverId = parseInt(req.body.receiverId);
         const senderId = parseInt(req.user.id);
         const fileName = req.file.originalname;
-        const fileUrl = `/uploads/messages/${req.file.filename}`;
+        const fileUrl = (req.file.path && req.file.path.startsWith('http')) ? req.file.path : `/uploads/messages/${req.file.filename}`;
         
         const pool = await getPool();
         const result = await pool.request()
@@ -216,5 +276,7 @@ module.exports = {
     sendMessage,
     getConversation,
     getChatList,
-    sendAttachment
+    sendAttachment,
+    getCourseMessages,
+    sendCourseMessage
 };

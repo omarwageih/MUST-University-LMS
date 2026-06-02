@@ -97,7 +97,28 @@ const register = async (req, res) => {
 };
 
 
-// ================= LOGIN =================
+/**
+ * @openapi
+ * /api/auth/login:
+ *   post:
+ *     summary: User login
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [email, password]
+ *             properties:
+ *               email:
+ *                 type: string
+ *               password:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Login successful
+ */
 const login = async (req, res) => {
     try {
         const { email, password } = req.body;
@@ -197,7 +218,11 @@ const login = async (req, res) => {
 const updateProfilePicture = async (req, res) => {
     try {
         if (!req.file) return res.status(400).json({ message: "No file uploaded" });
-        const filePath = `/uploads/profiles/${req.file.filename}`;
+
+        // Use path for Cloudinary, filename for local storage fallback
+        const filePath = (req.file.path && req.file.path.startsWith('http'))
+            ? req.file.path
+            : `/uploads/profiles/${req.file.filename}`;
         
         const pool = await getPool();
         await pool.request()

@@ -17,6 +17,7 @@ import { SocketProvider } from './context/SocketContext';
 import Sidebar from './components/Sidebar';
 import PageWrapper from './components/PageWrapper';
 import ErrorBoundary from './components/ErrorBoundary';
+import CommandPalette from './components/CommandPalette';
 
 
 import Breadcrumb from './components/Breadcrumb';
@@ -30,12 +31,15 @@ import Assignments from './pages/Assignments';
 import Auth from './pages/Auth';
 import Landing from './pages/Landing';
 import CourseDetails from './pages/CourseDetails';
+import CourseCatalog from './pages/CourseCatalog';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import Calendar from './pages/Calendar';
 import Discussions from './pages/Discussions';
 import Analytics from './pages/Analytics';
 import Messages from './pages/Messages';
+import QuizTaker from './pages/QuizTaker';
+import QuizBuilder from './pages/instructor/QuizBuilder';
 
 // Assistant Pages
 import AssistantDashboard from './pages/assistant/AssistantDashboard';
@@ -52,6 +56,7 @@ import ManageCourses from './pages/instructor/ManageCourses';
 import InstructorSubmissions from './pages/instructor/InstructorSubmissions';
 import InstructorCourseDetails from './pages/instructor/InstructorCourseDetails';
 import InstructorCourses from './pages/instructor/InstructorCourses';
+import CourseAnalytics from './pages/instructor/CourseAnalytics';
 
 /**
  * DashboardRedirect Component
@@ -111,6 +116,7 @@ const SocketWrapper = ({ toggleTheme, isDarkMode, location }) => {
     return (
         <div className="flex h-screen overflow-hidden relative">
             <Sidebar isDark={isDarkMode} toggleTheme={toggleTheme} />
+            <CommandPalette />
             <main className="flex-1 relative overflow-y-auto custom-scrollbar bg-slate-50/50 dark:bg-transparent">
                 <div className="p-4 md:p-10 max-w-[1600px] mx-auto min-h-full pb-24">
                     <Breadcrumb />
@@ -118,6 +124,7 @@ const SocketWrapper = ({ toggleTheme, isDarkMode, location }) => {
                         <Routes location={location} key={location.pathname}>
                             {/* Student Routes */}
                             <Route path="/student" element={<ProtectedRoute allowedRoles={['Student']}><PageWrapper><Dashboard /></PageWrapper></ProtectedRoute>} />
+                            <Route path="/catalog" element={<ProtectedRoute allowedRoles={['Student']}><PageWrapper><CourseCatalog /></PageWrapper></ProtectedRoute>} />
                             <Route path="/courses" element={<ProtectedRoute allowedRoles={['Student']}><PageWrapper><MyCourses /></PageWrapper></ProtectedRoute>} />
                             <Route path="/course/:id" element={<ProtectedRoute allowedRoles={['Student']}><PageWrapper><CourseDetails /></PageWrapper></ProtectedRoute>} />
                             <Route path="/grades" element={<ProtectedRoute allowedRoles={['Student']}><PageWrapper><Grades /></PageWrapper></ProtectedRoute>} />
@@ -125,6 +132,7 @@ const SocketWrapper = ({ toggleTheme, isDarkMode, location }) => {
                             <Route path="/calendar" element={<ProtectedRoute allowedRoles={['Student']}><PageWrapper><Calendar /></PageWrapper></ProtectedRoute>} />
                             <Route path="/discussions/:courseId" element={<ProtectedRoute allowedRoles={['Student', 'Instructor', 'Assistant']}><PageWrapper><Discussions /></PageWrapper></ProtectedRoute>} />
                             <Route path="/analytics" element={<ProtectedRoute allowedRoles={['Student']}><PageWrapper><Analytics /></PageWrapper></ProtectedRoute>} />
+                            <Route path="/quiz/:id" element={<ProtectedRoute allowedRoles={['Student']}><PageWrapper><QuizTaker /></PageWrapper></ProtectedRoute>} />
 
                             {/* Assistant Routes */}
                             <Route path="/assistant" element={<ProtectedRoute allowedRoles={['Assistant']}><PageWrapper><AssistantDashboard /></PageWrapper></ProtectedRoute>} />
@@ -140,7 +148,9 @@ const SocketWrapper = ({ toggleTheme, isDarkMode, location }) => {
                             <Route path="/instructor/courses" element={<ProtectedRoute allowedRoles={['Instructor']}><PageWrapper><ManageCourses /></PageWrapper></ProtectedRoute>} />
                             <Route path="/instructor/my-courses" element={<ProtectedRoute allowedRoles={['Instructor']}><PageWrapper><InstructorCourses /></PageWrapper></ProtectedRoute>} />
                             <Route path="/instructor/courses/:id" element={<ProtectedRoute allowedRoles={['Instructor']}><PageWrapper><InstructorCourseDetails /></PageWrapper></ProtectedRoute>} />
+                            <Route path="/instructor/analytics/:id" element={<ProtectedRoute allowedRoles={['Instructor']}><PageWrapper><CourseAnalytics /></PageWrapper></ProtectedRoute>} />
                             <Route path="/instructor/submissions" element={<ProtectedRoute allowedRoles={['Instructor']}><PageWrapper><InstructorSubmissions /></PageWrapper></ProtectedRoute>} />
+                            <Route path="/instructor/quiz-builder/:id" element={<ProtectedRoute allowedRoles={['Instructor']}><PageWrapper><QuizBuilder /></PageWrapper></ProtectedRoute>} />
 
                             {/* Common */}
                             <Route path="/profile" element={<PageWrapper><Profile /></PageWrapper>} />

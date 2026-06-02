@@ -10,11 +10,12 @@ const {
 
 const {
     getCourses, createCourse, updateCourse, deleteCourse, getMyCourses, getCourseContent,
+    getCourseAnalytics,
     addWeek, deleteWeek, addMaterial, deleteMaterial, addLecture, deleteLecture,
     getCourseMaterials, uploadCourseMaterial, deleteCourseMaterial,
     getAnnouncements, createAnnouncement, deleteAnnouncement,
     getCourseParticipants, getCourseGrades, unenrollParticipant,
-    getCourseAttendance, markAttendance, getCourseQuizzes, updateCourseWeights
+    getCourseAttendance, markAttendance, getCourseQuizzes, updateCourseWeights, exportGrades
 } = require('../controllers/courseController');
 
 const {
@@ -58,7 +59,9 @@ router.delete('/weeks/:id', requireCourseOwner, deleteWeek);
 // ===== Statistics & Tabs =====
 router.get('/courses/:courseId/participants', requireCourseOwner, getCourseParticipants);
 router.delete('/courses/:courseId/participants/:userId', requireCourseOwner, unenrollParticipant);
+router.get('/courses/:courseId/analytics', requireCourseOwner, getCourseAnalytics);
 router.get('/courses/:courseId/grades', requireCourseOwner, getCourseGrades);
+router.get('/courses/:courseId/grades/export', requireCourseOwner, exportGrades);
 router.get('/courses/:courseId/attendance', requireCourseOwner, getCourseAttendance);
 router.post('/attendance/mark', requireCourseOwner, markAttendance);
 router.get('/courses/:courseId/quizzes', requireCourseOwner, getCourseQuizzes);

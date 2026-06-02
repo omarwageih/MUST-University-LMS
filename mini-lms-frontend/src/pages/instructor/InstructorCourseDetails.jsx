@@ -518,6 +518,9 @@ const InstructorCourseDetails = () => {
                 return <GradesTab courseId={id} role="instructor" />;
             case 'activities':
                 return <ActivitiesTab assignments={courseData?.assignments} courseId={id} role="instructor" onRefresh={loadData} />;
+            case 'analytics':
+                navigate(`/instructor/analytics/${id}`);
+                return null;
             default:
                 return null;
         }
@@ -528,7 +531,8 @@ const InstructorCourseDetails = () => {
         { id: 'participants', label: 'Participants', icon: <Users size={16} /> },
         { id: 'grades', label: 'Grades', icon: <Award size={16} /> },
         { id: 'attendance', label: 'Attendance', icon: <Calendar size={16} /> },
-        { id: 'activities', label: 'Activities', icon: <ClipboardList size={16} /> }
+        { id: 'activities', label: 'Activities', icon: <ClipboardList size={16} /> },
+        { id: 'analytics', label: 'Analytics', icon: <TrendingUp size={16} /> }
     ];
 
     return (

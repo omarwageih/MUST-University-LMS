@@ -1,6 +1,7 @@
 const { sql, getPool } = require('../config/db');
 const { createNotification, logAudit, deleteFile, checkCourseAccess } = require('../utils/helpers');
 const { success, error, badRequest, forbidden, notFound } = require('../utils/responseHandler');
+const { Parser } = require('json2csv');
 
 
 
@@ -231,7 +232,7 @@ const addMaterial = async (req, res) => {
         let finalType = fileType || 'document';
 
         if (req.file) {
-            finalUrl = `/uploads/materials/${req.file.filename}`;
+            finalUrl = (req.file.path && req.file.path.startsWith('http')) ? req.file.path : `/uploads/materials/${req.file.filename}`;
             if (req.file.mimetype.includes('pdf')) finalType = 'PDF';
             else if (req.file.mimetype.includes('image')) finalType = 'Image';
             else if (req.file.mimetype.includes('video')) finalType = 'Video';
@@ -379,7 +380,9 @@ const getCourseMaterials = async (req, res) => {
 const uploadCourseMaterial = async (req, res) => {
     try {
         const { courseId, title, description, fileType } = req.body;
-        const fileUrl = req.file ? `/uploads/materials/${req.file.filename}` : (req.body.fileUrl || null);
+        const fileUrl = req.file
+            ? ((req.file.path && req.file.path.startsWith('http')) ? req.file.path : `/uploads/materials/${req.file.filename}`)
+            : (req.body.fileUrl || null);
         const uploadedBy = req.user.id;
 
         const pool = await getPool();
@@ -608,6 +611,35 @@ const markAttendance = async (req, res) => {
     } catch (err) { return error(res, "Failed to mark attendance", 500, err); }
 };
 
+const exportGrades = async (req, res) => {
+    const { courseId } = req.params;
+    try {
+        const pool = await getPool();
+        const result = await pool.request()
+            .input('cId', sql.Int, courseId)
+            .query(`
+                SELECT u.FullName, u.Email, cg.AssignmentTotal, cg.QuizTotal, cg.AttendanceTotal, cg.FinalGrade
+                FROM Course_Grades cg
+                JOIN Users u ON cg.StudentID = u.UserID
+                WHERE cg.CourseID = @cId
+            `);
+
+        if (result.recordset.length === 0) {
+            return badRequest(res, "No grades found for this course.");
+        }
+
+        const fields = ['FullName', 'Email', 'AssignmentTotal', 'QuizTotal', 'AttendanceTotal', 'FinalGrade'];
+        const json2csvParser = new Parser({ fields });
+        const csv = json2csvParser.parse(result.recordset);
+
+        res.header('Content-Type', 'text/csv');
+        res.attachment(`course_${courseId}_grades.csv`);
+        return res.send(csv);
+    } catch (err) {
+        return error(res, "Failed to export grades", 500, err);
+    }
+};
+
 const getCourseQuizzes = async (req, res) => {
     const { courseId } = req.params;
     try {
@@ -686,12 +718,95 @@ const updateCourseWeights = async (req, res) => {
     }
 };
 
+const getCourseAnalytics = async (req, res) => {
+    const { courseId } = req.params;
+    try {
+        const pool = await getPool();
+
+        // 1. Grade Distribution
+        const grades = await pool.request()
+            .input('cId', sql.Int, courseId)
+            .query(`
+                SELECT
+                    CASE
+                        WHEN TotalScore >= 90 THEN 'Excellent'
+                        WHEN TotalScore >= 80 THEN 'Very Good'
+                        WHEN TotalScore >= 70 THEN 'Good'
+                        WHEN TotalScore >= 60 THEN 'Pass'
+                        ELSE 'Fail'
+                    END as GradeBracket,
+                    COUNT(*) as Count
+                FROM (
+                    SELECT
+                        (
+                            ISNULL((SELECT (SUM(sub.Score) * 1.0 / NULLIF(SUM(a.Max_Score), 0)) * c.AssignmentWeight FROM Submission sub JOIN Assignment a ON sub.AssignmentID = a.AssignmentID WHERE sub.StudentID = cg.StudentID AND a.CourseID = cg.CourseID), 0) +
+                            ISNULL((SELECT (SUM(qr.Score) * 1.0 / NULLIF(SUM(q.Max_Score), 0)) * c.QuizWeight FROM Quiz_Result qr JOIN Quizzes q ON qr.QuizID = q.QuizID WHERE qr.StudentID = cg.StudentID AND q.CourseID = cg.CourseID), 0) +
+                            CAST(ISNULL((SELECT (COUNT(CASE WHEN att.Status IN ('Present', 'Late') THEN 1 END) * 1.0 / NULLIF(COUNT(*), 0)) * c.AttendanceWeight FROM Attendance att JOIN Lecture l ON att.LectureID = l.LectureID WHERE att.StudentID = cg.StudentID AND l.CourseID = cg.CourseID), 0) AS DECIMAL(5,2)) +
+                            ((ISNULL(cg.FinalGrade, 0) * 1.0 / 100.0) * c.FinalWeight)
+                        ) AS TotalScore
+                    FROM Course_Grades cg
+                    JOIN Course c ON cg.CourseID = c.CourseID
+                    WHERE cg.CourseID = @cId
+                ) AS Scores
+                GROUP BY
+                    CASE
+                        WHEN TotalScore >= 90 THEN 'Excellent'
+                        WHEN TotalScore >= 80 THEN 'Very Good'
+                        WHEN TotalScore >= 70 THEN 'Good'
+                        WHEN TotalScore >= 60 THEN 'Pass'
+                        ELSE 'Fail'
+                    END
+            `);
+
+        // 2. Attendance Heatmap (Engagement by Lecture)
+        const attendance = await pool.request()
+            .input('cId', sql.Int, courseId)
+            .query(`
+                SELECT
+                    l.LectureID, l.Title, l.Date,
+                    COUNT(CASE WHEN att.Status = 'Present' THEN 1 END) as PresentCount,
+                    COUNT(CASE WHEN att.Status = 'Late' THEN 1 END) as LateCount,
+                    COUNT(CASE WHEN att.Status = 'Absent' THEN 1 END) as AbsentCount,
+                    (SELECT COUNT(*) FROM Enrollment WHERE CourseID = @cId) as TotalEnrolled
+                FROM Lecture l
+                LEFT JOIN Attendance att ON l.LectureID = att.LectureID
+                WHERE l.CourseID = @cId
+                GROUP BY l.LectureID, l.Title, l.Date
+                ORDER BY l.Date ASC
+            `);
+
+        // 3. Assignment Performance
+        const assignments = await pool.request()
+            .input('cId', sql.Int, courseId)
+            .query(`
+                SELECT
+                    a.AssignmentID, a.Title, a.Max_Score,
+                    AVG(s.Score) as AvgScore,
+                    COUNT(s.SubID) as SubmissionCount,
+                    (SELECT COUNT(*) FROM Enrollment WHERE CourseID = @cId) as TotalExpected
+                FROM Assignment a
+                LEFT JOIN Submission s ON a.AssignmentID = s.AssignmentID
+                WHERE a.CourseID = @cId
+                GROUP BY a.AssignmentID, a.Title, a.Max_Score
+            `);
+
+        return success(res, {
+            gradeDistribution: grades.recordset,
+            attendanceTrend: attendance.recordset,
+            assignmentPerformance: assignments.recordset
+        });
+    } catch (err) {
+        return error(res, "Failed to fetch analytics", 500, err);
+    }
+};
+
 module.exports = {
     getCourses, createCourse, updateCourse, deleteCourse, getMyCourses, getCourseContent,
+    getCourseAnalytics,
     addWeek, deleteWeek, addMaterial, deleteMaterial, addLecture, deleteLecture,
     getCourseMaterials, uploadCourseMaterial, deleteCourseMaterial,
     getAnnouncements, createAnnouncement, deleteAnnouncement,
     getCourseParticipants, getCourseGrades, unenrollParticipant,
     getCourseAttendance, markAttendance, getCourseQuizzes,
-    updateCourseWeights
+    updateCourseWeights, exportGrades
 };

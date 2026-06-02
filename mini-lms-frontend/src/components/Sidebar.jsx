@@ -51,6 +51,7 @@ const Sidebar = ({ isDark, toggleTheme }) => {
     ];
 
     const studentItems = [
+      { icon: <LayoutDashboard size={22} />, label: 'Course Catalog', path: '/catalog' },
       { icon: <BookOpen size={22} />, label: 'My Courses', path: '/courses' },
       { icon: <ClipboardList size={22} />, label: 'Assignments', path: '/assignments' },
       { icon: <Award size={22} />, label: 'My Grades', path: '/grades' },
